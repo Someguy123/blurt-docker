@@ -171,7 +171,7 @@ if [[ -f .env ]]; then
 fi
 
 : ${CONFIG_FILE="${DATADIR}/witness_node_data_dir/config.ini"}
-: ${NETWORK="hive"}
+: ${NETWORK="blurt"}
 
 
 if [[ "$NETWORK" == "hive" ]]; then
