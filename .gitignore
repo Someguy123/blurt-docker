@@ -7,6 +7,7 @@ data/witness_node_data_dir/rocksdb*
 .idea
 .DS_Store
 .env
+snapshot.json
 
 data/advanced_benchmark.json
 data/r_advanced_benchmark.json
