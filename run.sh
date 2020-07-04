@@ -2285,7 +2285,7 @@ publish() {
     if [[ "$SECTAG" == "n/a" ]]; then
         msg bold yellow  " >> Will build tag $V as tags $MAIN_TAG (no second tag)"
     else
-        SECOND_TAG="someguy123/steem:$SECTAG"
+        SECOND_TAG="$DK_TAG_BASE:$SECTAG"
         msg bold yellow " >> Will build tag $V as tags $MAIN_TAG and $SECOND_TAG"
     fi
     sleep 5
