@@ -224,6 +224,8 @@ elif [[ "$NETWORK" == "blurt" ]]; then
     : ${DKR_DATA_MOUNT="/steem"}    # Mount $DATADIR onto this folder within the container
     : ${DKR_SHM_MOUNT="/shm"}       # Mount $SHM_DIR onto this folder within the container
     : ${DKR_RUN_BIN="blurtd"}       # Run this executable within the container
+
+    : ${PORTS="2015"}
 fi
 
 
