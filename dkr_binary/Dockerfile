@@ -1,32 +1,36 @@
 FROM debian:10
 
-ARG BLURT_BINARY_URL="https://gitlab.com/blurt/blurt/-/jobs/632388178/artifacts/download?file_type=archive"
-ENV BLURT_BINARY_URL ${BLURT_BINARY_URL}
-
-ARG BLURT_WALLET_URL="https://gitlab.com/blurt/blurt/-/jobs/630888073/artifacts/download?file_type=archive"
-ENV BLURT_WALLET_URL ${BLURT_WALLET_URL}
-
-ARG BLURT_BINARY_NAME="blurtd"
-ENV BLURT_BINARY_NAME ${BLURT_BINARY_NAME}
-
 RUN apt-get update && \
-    apt-get install -y unzip wget libbz2-dev libsnappy-dev libncurses5-dev libreadline-dev && \
+    apt-get install -y unzip wget libbz2-dev libsnappy-dev libncurses5 libncurses5-dev libreadline-dev && \
     apt-get clean -qy
 
+ARG BLURT_JOB="676941016"
+ENV BLURT_JOB ${BLURT_JOB}
+
+ARG BLURT_BINARY_URL="https://gitlab.com/blurt/blurt/-/jobs/${BLURT_JOB}/artifacts/download?file_type=archive"
+ENV BLURT_BINARY_URL ${BLURT_BINARY_URL}
+
+ARG BLURT_BINARY_PATH="build/bin/blurtd"
+ENV BLURT_BINARY_PATH ${BLURT_BINARY_PATH}
+
+ARG BLURT_WALLET_BINARY_PATH="build/bin/cli_wallet"
+ENV BLURT_WALLET_BINARY_PATH ${BLURT_WALLET_BINARY_PATH}
+
 RUN cd /tmp && \
-    echo " >>> Downloading blurtd binary: ${BLURT_BINARY_URL} ..." && \
+    echo " >>> Downloading blurt binaries zip: ${BLURT_BINARY_URL} ..." && \
     wget -O blurt.zip "${BLURT_BINARY_URL}" && \
     echo " >>> Unzipping blurt.zip ..." && \
     unzip blurt.zip && \
     echo " >>> Installing blurtd ..." && \
-    cp "build/programs/blurtd/${BLURT_BINARY_NAME}" /usr/bin/blurtd && \
-    echo "Cleaning up ..." && \
-    rm -rvf build blurt.zip && \
-    echo " >>> Downloading blurtd wallet: ${BLURT_WALLET_URL} ..." && \
-    wget -O blurt.zip "${BLURT_WALLET_URL}" && \
-    echo " >>> Unzipping blurt.zip ..." && \
-    unzip blurt.zip && \
-    cp "build/programs/cli_wallet/cli_wallet" /usr/bin/cli_wallet && \
+    cp -v "${BLURT_BINARY_PATH}" /usr/bin/blurtd && \
+#    echo "Cleaning up ..." && \
+#    rm -rvf build blurt.zip && \
+#    echo " >>> Downloading blurtd wallet: ${BLURT_WALLET_URL} ..." && \
+#    wget -O blurt.zip "${BLURT_WALLET_URL}" && \
+#    echo " >>> Unzipping blurt.zip ..." && \
+#    unzip blurt.zip && \
+    echo " >>> Installing cli_wallet ..." && \
+    cp -v "${BLURT_WALLET_BINARY_PATH}" /usr/bin/cli_wallet && \
     echo "Cleaning up ..." && \
     rm -rvf build blurt.zip
 
@@ -46,3 +50,4 @@ ENV STEEMD_BIN ${STEEMD_BIN}
 
 RUN echo "Please configure me! You need to mount a data directory onto /steem of this container to it to function correctly. (if you're using Steem-in-a-box most of this is handled automatically)"
 CMD ["sh", "-c", "${STEEMD_BIN}"]
+

@@ -306,7 +306,7 @@ fi
 
 
 BUILD_FULL=0        # Internal variable. Set to 1 by build_full to inform child functions
-CUST_TAG="steem"    # Placeholder for custom tag var CUST_TAG (shared between functions)
+CUST_TAG="$NETWORK" # Placeholder for custom tag var CUST_TAG (shared between functions)
 BUILD_VER=""        # Placeholder for BUILD_VER shared between functions
 
 
@@ -509,7 +509,7 @@ optimize() {
 
 parse_build_args() {
     BUILD_VER=$1
-    CUST_TAG="steem:$BUILD_VER"
+    CUST_TAG="${DOCKER_IMAGE}:$BUILD_VER"
     if (( $BUILD_FULL == 1 )); then
         CUST_TAG+="-full"
     fi
@@ -599,7 +599,7 @@ build() {
     !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
         ${RESET}
             "
-            msg bold green " +++ Successfully built steemd"
+            msg bold green " +++ Successfully built $DKR_RUN_BIN for ${NETWORK_NAME}"
             msg green " +++ Steem node type: ${BOLD}${fmm}"
             msg green " +++ Version/Branch: ${BOLD}${BUILD_VER}"
             msg green " +++ Build args: ${BOLD}${BUILD_ARGS[@]}"
@@ -615,13 +615,30 @@ build() {
     docker build -t "$DOCKER_IMAGE" .
     ret=$?
     if (( $ret == 0 )); then
-        msg bold green " +++ Successfully built current stable steemd"
+        msg bold green " +++ Successfully built current stable ${DKR_RUN_BIN}"
         msg green " +++ Steem node type: ${BOLD}${fmm}"
         msg green " +++ Docker tag: ${DOCKER_IMAGE}"
     else
         msg bold red " !!! ERROR: Something went wrong during the build process."
         msg red " !!! Please scroll up and check for any error output during the build."
     fi
+}
+
+build_binary() {
+    DOCKER_DIR="${DIR}/dkr_binary"
+    msg bold green "\n [!!!] Building a Docker image using binaries - binary docker build via ${DOCKER_DIR}/Dockerfile ...\n"
+    if (( $# > 0 )) && [[ -n "$1" ]] && [[ "$1" != "n/a" ]] && [[ "$1" != "none" ]]; then
+        if [[ "$1" == "tag" ]]; then
+            build not_applicable "$@"
+            exit $?
+        fi
+        if [[ "$NETWORK" == "blurt" ]]; then
+            BLURT_JOB="$1"; shift
+            build not_applicable "$@" "BLURT_JOB=${BLURT_JOB}"
+            exit $?
+        fi
+    fi
+    build "$@"
 }
 
 # Build full memory node (for RPC nodes) as a docker image
@@ -1190,10 +1207,10 @@ dlrocksdb() {
         msg bold green " #                                                                                          # "
         msg bold green " #                          Steem-in-a-Box RocksDB Downloader                               # "
         msg bold green " #                                                                                          # "
-        msg bold green " #                   (C) 2020 Someguy123 - https://steempeak.com/@someguy123                # "
+        msg bold green " #                   (C) 2020 Someguy123 - https://peakd.com/@someguy123                    # "
         msg bold green " #                                                                                          # "
         msg bold green " #                                                                                          # "
-        msg bold green " #    SRC: github.com/Someguy123/steem-docker                                               # "
+        msg bold green " #    SRC: github.com/Someguy123/hive-docker                                                # "
         msg bold green " #                                                                                          # "
         msg bold green " #    Fast and easy download + installation of RocksDB files from Privex Inc.               # "
         msg bold green " #                                                                                          # "
@@ -1452,8 +1469,8 @@ install() {
 install_full() {
     msg yellow " -> Loading image from ${DK_TAG_FULL}"
     docker pull "$DK_TAG_FULL" 
-    msg green " -> Tagging as steem"
-    docker tag "$DK_TAG_FULL" steem
+    msg green " -> Tagging as ${DOCKER_IMAGE}"
+    docker tag "$DK_TAG_FULL" "${DOCKER_IMAGE}"
     msg bold green " -> Installation completed. You may now configure or run the server"
 }
 
@@ -2058,8 +2075,8 @@ siab-monitor() {
     local remote_props remote_head_block blocks_behind mins_remaining
     error_control 0
     msg
-    msg nots bold green "--- Steem-in-a-box Sync Monitor --- \n"
-    msg nots bold green "Monitoring your local steemd instance\n"
+    msg nots bold green "--- ${SELF_NAME} Sync Monitor --- \n"
+    msg nots bold green "Monitoring your local ${NETWORK_NAME} ${DKR_RUN_BIN} instance\n"
     msg nots bold green "Block data will update every 10 seconds, showing the block number that your node is synced up to"
     msg nots bold green "the date/time that block was produced, and how far behind in days/hours/minutes that block is.\n"
     msg nots bold green "After the first check, we'll also output how many blocks have been synced so far, as well as"
@@ -2258,7 +2275,7 @@ sb_clean() {
 publish() {
     if (( $# < 2 )); then
         msg green "Usage: $0 publish [mira|nomira] [version] (extratag def: latest)"
-        msg yellow "Environment vars:\n\tMAIN_TAG - Override the primary tag (default: someguy123/steem:\$V)\n"
+        msg yellow "Environment vars:\n\tMAIN_TAG - Override the primary tag (default: $DK_TAG_BASE:[version])\n"
         return 1
     fi
     MKMIRA="$1"
@@ -2297,6 +2314,34 @@ publish() {
     msg bold green " >> Finished"
 }
 
+publish_binary() {
+    if (( $# < 2 )); then
+        msg green "Usage: $0 publish [build_version] [docker_version] (extratag def: latest)"
+        msg yellow "Environment vars:\n\tMAIN_TAG - Override the primary tag (default: $DK_TAG_BASE:[docker_version])\n"
+        return 1
+    fi
+    BUILD_VERSION="$1" V="$2" SECTAG="latest"
+    BUILD_OPTS=()
+    : ${MAIN_TAG="$DK_TAG_BASE:$V"}
+    (( $# > 2 )) && SECTAG="$3"
+    if [[ "$SECTAG" == "n/a" ]]; then
+        msg bold yellow  " >> Will build binary version/tag '${BUILD_VERSION}' tagged as $MAIN_TAG (no second tag)"
+    else
+        SECOND_TAG="$DK_TAG_BASE:$SECTAG"
+        msg bold yellow  " >> Will build binary version/tag '${BUILD_VERSION}' tagged as $MAIN_TAG and $SECOND_TAG"
+    fi
+    sleep 1
+    ./run.sh build "$V" tag "$MAIN_TAG" "${BUILD_OPTS[@]}"
+    msg bold green "\n [...] Tagging $MAIN_TAG to second tag '${SECOND_TAG}' (if applicable)\n"
+    sleep 1
+    [[ "$SECTAG" != "n/a" ]] && docker tag "$MAIN_TAG" "$SECOND_TAG"
+    msg bold green "\n [...] Pushing main tag $MAIN_TAG\n"
+    sleep 1
+    docker push "$MAIN_TAG"
+    [[ "$SECTAG" != "n/a" ]] && msg bold green "\n [...] Pushing second tag $SECOND_TAG\n" && docker push "$SECOND_TAG"
+    msg bold green "\n +++ Finished +++ \n"
+}
+
 
 if [ "$#" -lt 1 ]; then
     help
@@ -2314,6 +2359,9 @@ case $1 in
     build_local)
         build_local "${@:2}"
         ;;
+    binar*_build|binar*-build|build_binar*|build-binar*)
+        build_binary "${@:2}"
+        ;;
     install_docker)
         install_docker
         ;;
@@ -2325,6 +2373,9 @@ case $1 in
         ;;
     publish)
         publish "${@:2}"
+        ;;
+    publish_bin*|publish-bin*|bin*-publish|bin*_publish)
+        publish_binary "${@:2}"
         ;;
     start)
         start "${@:2}"
