@@ -2331,7 +2331,7 @@ publish_binary() {
         msg bold yellow  " >> Will build binary version/tag '${BUILD_VERSION}' tagged as $MAIN_TAG and $SECOND_TAG"
     fi
     sleep 1
-    ./run.sh build_binary "$V" tag "$MAIN_TAG" "${BUILD_OPTS[@]}"
+    ./run.sh build_binary "$BUILD_VERSION" tag "$MAIN_TAG" "${BUILD_OPTS[@]}"
     msg bold green "\n [...] Tagging $MAIN_TAG to second tag '${SECOND_TAG}' (if applicable)\n"
     sleep 1
     [[ "$SECTAG" != "n/a" ]] && docker tag "$MAIN_TAG" "$SECOND_TAG"
