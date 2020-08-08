@@ -24,7 +24,7 @@ flush = 1000
 # P2P nodes to connect to on startup (may specify multiple times)
 p2p-seed-node = seed1.blurt.world:2001              #  @blurt       (DE)                 (ASN: Hetzner Online GmbH)
 p2p-seed-node = seed2.blurt.world:2001              #  @blurt       (DE)                 (ASN: Hetzner Online GmbH)
-p2p-seed-node = blurtseed-se.privex.io:2001         #  @privex      (SE)                 (ASN: Privex Inc.)
+p2p-seed-node = blurtseed-se.privex.io:2015         #  @privex      (SE)                 (ASN: Privex Inc.)
 
 # Pairs of [BLOCK_NUM,BLOCK_ID] that should be enforced as checkpoints.
 # checkpoint =
