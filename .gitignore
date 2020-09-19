@@ -1,7 +1,9 @@
 data/witness_node_data_dir/config.ini*
 data/witness_node_data_dir/database.cfg
 data/rocksdb/
+data/shm/
 data/witness_node_data_dir/rocksdb*
+data/witness_node_data_dir/shm/
 
 .vscode
 .idea
@@ -12,6 +14,8 @@ snapshot.json
 data/advanced_benchmark.json
 data/r_advanced_benchmark.json
 rocksdb*
+*shared_memory*
+*state_snapshot*
 
 dkr_local/src/
 .rsync-partial/

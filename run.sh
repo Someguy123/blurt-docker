@@ -184,9 +184,12 @@ if [[ "$NETWORK" == "hive" ]]; then
     : ${BC_HTTP="http://files.privex.io/hive/block_log.lz4"}        # HTTP or HTTPS url to grab the blockchain from. Set compression in BC_HTTP_CMP
     : ${BC_HTTP_RAW="http://files.privex.io/hive/block_log"}        # Uncompressed block_log over HTTP
     : ${BC_HTTP_CMP="lz4"}                                          # Compression type, can be "xz", "lz4", or "no" (for no compression)
-    : ${BC_RSYNC="rsync://files.privex.io/hive/block_log"}          # Anonymous rsync daemon URL to the raw block_log
+
+    : ${RSYNC_BASE="rsync://files.privex.io/hive"}
+    : ${BC_RSYNC="${RSYNC_BASE}/block_log"}                         # Anonymous rsync daemon URL to the raw block_log
     
-    : ${ROCKSDB_RSYNC="rsync://files.privex.io/hive/rocksdb/"}      # Rsync URL for MIRA RocksDB files
+    : ${ROCKSDB_RSYNC="${RSYNC_BASE}/rocksdb/"}                     # Rsync URL for MIRA RocksDB files
+    : ${SNAPSHOT_RSYNC="${RSYNC_BASE}/privexsnap/"}                 # Rsync URL for Eclipse Snapshot
 
     : ${DK_TAG_BASE="someguy123/hive"}
 
@@ -209,9 +212,11 @@ elif [[ "$NETWORK" == "blurt" ]]; then
     : ${BC_HTTP="http://files.privex.io/blurt/block_log.lz4"}        # HTTP or HTTPS url to grab the blockchain from. Set compression in BC_HTTP_CMP
     : ${BC_HTTP_RAW="http://files.privex.io/blurt/block_log"}        # Uncompressed block_log over HTTP
     : ${BC_HTTP_CMP="lz4"}                                           # Compression type, can be "xz", "lz4", or "no" (for no compression)
-    : ${BC_RSYNC="rsync://files.privex.io/blurt/block_log"}          # Anonymous rsync daemon URL to the raw block_log
+    : ${RSYNC_BASE="rsync://files.privex.io/blurt"}
+    : ${BC_RSYNC="${RSYNC_BASE}/block_log"}                         # Anonymous rsync daemon URL to the raw block_log
     
-    : ${ROCKSDB_RSYNC="rsync://files.privex.io/blurt/rocksdb/"}      # Rsync URL for MIRA RocksDB files
+    : ${ROCKSDB_RSYNC="${RSYNC_BASE}/rocksdb/"}                     # Rsync URL for MIRA RocksDB files
+    : ${SNAPSHOT_RSYNC="${RSYNC_BASE}/privexsnap/"}                 # Rsync URL for Eclipse Snapshot
 
     : ${DK_TAG_BASE="someguy123/blurt"}
 
@@ -257,11 +262,13 @@ fi
 # and save time by not having to decompress after the download is finished
 : ${BC_HTTP_CMP="lz4"}
 
+: ${RSYNC_BASE="rsync://files.privex.io/steem"}
 # Anonymous rsync daemon URL to the raw block_log, for repairing/resuming
 # a damaged/incomplete block_log. Set to "no" to disable rsync when resuming.
-: ${BC_RSYNC="rsync://files.privex.io/steem/block_log"}
-# Rsync URL for MIRA RocksDB files
-: ${ROCKSDB_RSYNC="rsync://files.privex.io/steem/rocksdb/"}
+: ${BC_RSYNC="${RSYNC_BASE}/block_log"}                         # Anonymous rsync daemon URL to the raw block_log
+
+: ${ROCKSDB_RSYNC="${RSYNC_BASE}/rocksdb/"}                     # Rsync URL for MIRA RocksDB files
+: ${SNAPSHOT_RSYNC="${RSYNC_BASE}/privexsnap/"}                 # Rsync URL for Eclipse Snapshot
 
 : ${DK_TAG_BASE="someguy123/steem"}
 : ${DK_TAG="${DK_TAG_BASE}:latest"}
@@ -297,6 +304,7 @@ fi
 : ${AUTO_FIX_BLOCKLOG=0}
 : ${AUTO_FIX_BLOCKINDEX=0}
 : ${AUTO_FIX_ROCKSDB=0}
+: ${AUTO_FIX_SNAPSHOT=0}
 
 # If AUTO_FIX_BLOCKLOG is set to 1, this controls whether we verify block_log via checksummed rsync, in the
 # event that the local block_log is the same size as the remote block_log
@@ -453,6 +461,12 @@ help() {
     fix-blocks      - downloads / repairs your blockchain, block index, and/or rocksdb. 
                       check '$0 fix-blocks help' for more info
 
+    load_snap|loadsnap|load_snapshot|loadsnapshot|import_snap [snapshot_name]
+                    - Loads the snapshot 'snapshot_name' into your chain state (new feature as of Hive 1.24.0)
+    
+    dump_snap|dumpsnap|dump_snapshot|dumpsnapshot|export_snap [snapshot_name]
+                    - Exports chain state to the snapshot 'snapshot_name' (new feature as of Hive 1.24.0)
+
     clean           - Remove blockchain, p2p, and/or shared mem folder contents (warns beforehand)
     dlblocks        - download and decompress the blockchain and block_log.index to speed up your first start
     dlblockindex    - download/repair just the block index (block_log.index)
@@ -522,7 +536,8 @@ parse_build_args() {
             shift; shift;    # Get rid of the two tag arguments. Everything after is now build args
         fi
     fi
-    local has_steem_src='n'
+    local has_steem_src='n' has_clear_votes=0 has_skip_txid=0 has_lowmem_node=0 has_enable_mira=0
+
     if (( $# >= 1 )); then
         msg yellow " >> Additional build arguments specified."
         for a in "$@"; do
@@ -531,9 +546,31 @@ parse_build_args() {
             if grep -q 'STEEM_SOURCE' <<< "$a"; then
                 has_steem_src='y'
             fi
+            grep -q 'CLEAR_VOTES' <<< "$a" && has_clear_votes=1 || has_clear_votes=0
+            grep -q 'SKIP_BY_TX_ID' <<< "$a" && has_skip_txid=1 || has_skip_txid=0
+            grep -q 'LOW_MEMORY_NODE' <<< "$a" && has_lowmem_node=1 || has_lowmem_node=0
+            grep -q 'ENABLE_MIRA' <<< "$a" && has_enable_mira=1 || has_enable_mira=0
         done
     fi
-
+    
+    if (( BUILD_FULL )); then
+        if ! (( has_clear_votes )); then
+            msg bold yellow " [!!] CLEAR_VOTES wasn't specified but BUILD_FULL=1 - defaulting CLEAR_VOTES=OFF"
+            BUILD_ARGS+=('--build-arg' 'CLEAR_VOTES=OFF')
+        fi
+        if ! (( has_skip_txid )); then
+            msg bold yellow " [!!] SKIP_BY_TX_ID wasn't specified but BUILD_FULL=1 - defaulting SKIP_BY_TX_ID=OFF"
+            BUILD_ARGS+=('--build-arg' 'SKIP_BY_TX_ID=OFF')
+        fi
+        if ! (( has_lowmem_node )); then
+            msg bold yellow " [!!] LOW_MEMORY_NODE wasn't specified but BUILD_FULL=1 - defaulting LOW_MEMORY_NODE=OFF"
+            BUILD_ARGS+=('--build-arg' 'LOW_MEMORY_NODE=OFF')
+        fi
+        if ! (( has_enable_mira )); then
+            msg bold yellow " [!!] ENABLE_MIRA wasn't specified but BUILD_FULL=1 - defaulting ENABLE_MIRA=OFF"
+            BUILD_ARGS+=('--build-arg' 'ENABLE_MIRA=OFF')
+        fi
+    fi
     if [[ "$has_steem_src" == "y" ]]; then
         msg bold yellow " [!!] STEEM_SOURCE has been specified in the build arguments. Using source from build args instead of global"
     else
@@ -577,7 +614,7 @@ build_local() {
 #
 build() {
     fmm="Low Memory Mode (For Seed / Witness nodes)"
-    (( $BUILD_FULL == 1 )) && fmm="Full Memory Mode (For RPC nodes)" && DOCKER_DIR="$FULL_DOCKER_DIR"
+    (( $BUILD_FULL == 1 )) && fmm="Full Memory Mode (For RPC nodes)"
     BUILD_MSG=" >> Building docker container [[ ${fmm} ]]"
     if (( $# >= 1 )); then
         parse_build_args "$@"
@@ -599,8 +636,8 @@ build() {
     !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
         ${RESET}
             "
-            msg bold green " +++ Successfully built $DKR_RUN_BIN for ${NETWORK_NAME}"
-            msg green " +++ Steem node type: ${BOLD}${fmm}"
+            msg bold green " +++ Successfully built ${NETWORK_NAME}"
+            msg green " +++ ${NETWORK_NAME} node type: ${BOLD}${fmm}"
             msg green " +++ Version/Branch: ${BOLD}${BUILD_VER}"
             msg green " +++ Build args: ${BOLD}${BUILD_ARGS[@]}"
             msg green " +++ Docker tag: ${CUST_TAG}"
@@ -615,8 +652,8 @@ build() {
     docker build -t "$DOCKER_IMAGE" .
     ret=$?
     if (( $ret == 0 )); then
-        msg bold green " +++ Successfully built current stable ${DKR_RUN_BIN}"
-        msg green " +++ Steem node type: ${BOLD}${fmm}"
+        msg bold green " +++ Successfully built current stable ${NETWORK_NAME}"
+        msg green " +++ ${NETWORK_NAME} node type: ${BOLD}${fmm}"
         msg green " +++ Docker tag: ${DOCKER_IMAGE}"
     else
         msg bold red " !!! ERROR: Something went wrong during the build process."
@@ -895,6 +932,33 @@ fix-blocks-rocksdb() {
     fi
 }
 
+fix-blocks-snapshot() {
+    msg
+    msg bold green " ========================================================================"
+    msg bold green " =                                                                      ="
+    msg bold green " =      Download Hive Snapshot Folder                                   ="
+    msg bold green " =                                                                      ="
+    msg bold green " ========================================================================"
+    msg
+
+    msg nots yellow " >> For Hive 1.24.0 and newer, a special snapshot format is now available, and snapshots are published" 
+    msg nots yellow " >> by Privex regularly. These snapshots work with non-MIRA, and possibly MIRA installations too."
+    msg
+    msg nots cyan   "    Local Snapshot folder:           ${BOLD}${DATADIR}/witness_node_data_dir/snapshot/privexsnap/"
+    msg nots cyan   "    Remote Snapshot source:          ${BOLD}$SNAPSHOT_RSYNC"
+    msg
+    msg
+    if _fixbl_prompt "$AUTO_FIX_SNAPSHOT" " ${MAGENTA}Do you want to synchronise your snapshot files with the server?${RESET} (y/N) > " defno; then
+        msg
+        msg nots green "\n [...] Updating Snapshot files to match the remote server's copy ..."
+        _SILENCE_RDB_INTRO=1 _dlsnapshot
+        msg
+        msg green " [+++] Finished downloading/validating Snapshot files into ${DATADIR}/witness_node_data_dir/snapshot/privexsnap/ \n"
+    else
+        msg nots red "\n [!!!] Not synchronising snapshot files with remote server \n"
+    fi
+}
+
 _fix_blocks_help() {
     MSG_TS_DEFAULT=0
     msg
@@ -983,7 +1047,9 @@ fix-blocks() {
             rocks*|mira|MIRA)
                 fix-blocks-rocksdb
                 return $?;;
-            
+            snap*)
+                fix-blocks-snapshot
+                return $?;;
             all)
                 echo
                 ;;
@@ -1002,6 +1068,8 @@ fix-blocks() {
     fix-blocks-blocklog "$local_bl"
     msg "\n"
     fix-blocks-index "${local_bl}.index"
+    msg "\n"
+    fix-blocks-snapshot
     msg "\n"
     fix-blocks-rocksdb
     msg "\n"
@@ -1084,6 +1152,86 @@ _foldersync-fresh() {
     # delete        = remove any local files in out_dir which don't exist on the server
     # partial-dir   = store partially downloaded file chunks in this folder, allowing downloads to be resumed
     rsync -rvh --delete --inplace --progress "$1" "$2"
+}
+
+_dlsnapshot() {
+    local url="$SNAPSHOT_RSYNC" out_dir="${DATADIR}/witness_node_data_dir/snapshot/privexsnap/" 
+    # rdb_folder_existed is changed to 1 if we detect existing RocksDB files
+    # used to decide whether we need to ignore timestamps + use rsync checksumming
+    local rdb_folder_existed=0
+
+    MSG_TS_DEFAULT=0
+
+    (( $# > 0 )) && url="$1"
+    (( $# > 1 )) && out_dir="$2"
+
+    ######
+    # If the snapshot folder doesn't exist, then we create it and we download the snapshot files from scratch
+    # without needing Rsync checksumming + timestamp/size ignoring
+    #
+    # If it does exist, we check if it's empty. If it's empty, we use the same "fresh" rsync download method.
+    #
+    # If the folder isn't empty (i.e. at least 1 file), then we have to use the "rsync repair/replace" method,
+    # which disables timestamp/size comparisons, and enables additional checksumming to guarantee we don't have
+    # any corrupted snapshot files locally.
+    ######
+    msg
+    if [[ ! -d "$out_dir" ]]; then
+        msg yellow " >> Output directory '$out_dir' doesn't exist..."
+        msg green  " >> Creating folder + parent folders of '$out_dir' ..."
+        mkdir -v -p "$out_dir"
+        msg
+        msg green " >> As the output folder didn't exist, will download snapshot using faster method without rsync"
+        msg green " >> additional checksumming\n"
+    else
+        # Get list of files in rocksdb folder using `ls`, then count number of entries to detect if folder is empty
+        local rdb_files=($(ls "$out_dir"))
+        local total_rdb_files=$((${#rdb_files[@]}))
+        if (( total_rdb_files > 0 )); then
+            msg green " >> Output directory '$out_dir' already exists."
+            msg green " >> To ensure your existing snapshot files match the remote server exactly, we're going to "
+            msg green " >> ignoring size/timestamps. \n"
+
+            rdb_folder_existed=1
+        else
+            msg green " >> Output directory '$out_dir' already exists."
+            msg green " >> Folder appears to be empty. Downloading snapshot using faster method without rsync"
+            msg green " >> additional checksumming\n"
+            rdb_folder_existed=0
+        fi
+
+    fi
+
+    msg yellow "This may take a while, and may at times appear to be stalled. ${BOLD}Be patient, it may take time (3 to 10 mins) to scan the differences."
+    msg yellow "Once it detects the differences, it will download at very high speed depending on how much of your snapshot files are intact."
+    echo -e "\n==============================================================="
+    echo -e "${BOLD}Downloading via:${RESET}\t${url}"
+    echo -e "${BOLD}Writing to:${RESET}\t\t${out_dir}"
+    echo -e "===============================================================\n"
+
+    if (( rdb_folder_existed == 0 )); then
+        msg ts bold green " [+] Downloading snapshot using 'fresh download' method"
+        msg ts bold green " [+] This should take no more than a few minutes before it starts to show download progress\n"
+        _foldersync-fresh "$url" "$out_dir"
+    else
+        msg green " [+] Depending on your CPU / Disk speeds, this may take 10+ minutes before it displays any"
+        msg green " [+] download progress. Please be patient."
+        msg green " [+] If you have a fast network (100mbps+), ${BOLD}consider deleting snapshot${RESET}${GREEN} and re-running this"
+        msg green " [+] command, as explained above in bold yellow text.\n"
+        msg ts bold green " [+] Downloading snapshot using 'repair existing & download new files' method ...\n"
+
+        _foldersync-repair "$url" "$out_dir"
+    fi
+    # rsync -Irvhc --delete --partial-dir="${DIR}/.rsync-partial" --progress "$url" "${out_dir}"
+    ret=$?
+    msg
+    if (( ret == 0 )); then
+        msg ts bold green " (+) FINISHED. snapshot downloaded via rsync (make sure to check for any errors above)"
+    else
+        msg ts bold red "An error occurred while downloading snapshot via rsync... please check above for errors"
+    fi
+    return $ret
+
 }
 
 _dlrocksdb() {
@@ -1656,6 +1804,49 @@ start() {
         msg green "Appending extra arguments: $*"
     fi
     docker_run_node "$@"
+}
+
+load_snap() {
+    if (( $# < 1 )); then
+        msg nots cyan "Usage: $0 load_snap [snapshot_name]\n"
+        msg nots yellow "Starts $DKR_RUN_BIN with --load-snapshot [snapshot_name] to load a snapshot dump (snapshots were added in Hive v1.24.0)\n"
+
+        msg nots yellow "To create a snapshot, use: ${CYAN}$0 dump_snap [snapshot_name]\n"
+        msg nots yellow "By default, snapshots will be stored in the folder: ${DATADIR}/witness_node_data_dir/snapshot/\n"
+        return
+    fi
+
+    if ! grep -q "state_snapshot" "${CONFIG_FILE}"; then
+        msg nots red "ERROR: Your config file doesn't appear to contain the plugin 'state_snapshot'"
+        msg nots red "You can't load or dump snapshots without the plugin state_snapshot"
+        msg nots red "Please make sure 'plugin = state_snapshot' is present in your config: ${CONFIG_FILE}"
+        return 1
+    fi
+    
+    remove_seed_exists 1
+    msg green " >>> Starting ${DKR_RUN_BIN} - loading snapshot: $1\n"
+    start --load-snapshot "$1" "${@:2}"
+}
+
+dump_snap() {
+    if (( $# < 1 )); then
+        msg nots cyan "Usage: $0 dump_snap [snapshot_name]\n"
+        msg nots yellow "Starts $DKR_RUN_BIN with --dump-snapshot [snapshot_name] to create a snapshot dump (snapshots were added in Hive v1.24.0)\n"
+
+        msg nots yellow "To load a snapshot, use: ${CYAN}$0 load_snap [snapshot_name]\n"
+        msg nots yellow "By default, snapshots will be stored in the folder: ${DATADIR}/witness_node_data_dir/snapshot/\n"
+        return
+    fi
+    if ! grep -q "state_snapshot" "${CONFIG_FILE}"; then
+        msg nots red "ERROR: Your config file doesn't appear to contain the plugin 'state_snapshot'"
+        msg nots red "You can't load or dump snapshots without the plugin state_snapshot"
+        msg nots red "Please make sure 'plugin = state_snapshot' is present in your config: ${CONFIG_FILE}"
+        return 1
+    fi
+    
+    remove_seed_exists 1
+    msg green " >>> Starting ${DKR_RUN_BIN} - dumping snapshot: $1\n"
+    start --dump-snapshot "$1" "${@:2}"
 }
 
 # Usage: ./run.sh replay
@@ -2385,6 +2576,12 @@ case $1 in
         ;;
     memory_replay)
         memory_replay "${@:2}"
+        ;;
+    load_snap|loadsnap|load_snapshot|loadsnapshot|import_snap|import_snapshot|importsnap|importsnapshot)
+        load_snap "${@:2}"
+        ;;
+    dump_snap|dumpsnap|dump_snapshot|dumpsnapshot|export_snap|export_snapshot|exportsnap|exportsnapshot|create_snap|createsnap|create_snapshot|createsnapshot)
+        dump_snap "${@:2}"
         ;;
     shm_size)
         shm_size $2
