@@ -5,7 +5,7 @@ p2p-endpoint = 0.0.0.0:2015
 p2p-max-connections = 200
 
 # Shared file size
-shared-file-size = 16G
+shared-file-size = 10G
 shared-file-dir = /shm/
 
 # A 2-precision percentage (0-10000) that defines the threshold for when to 
@@ -25,6 +25,8 @@ flush = 1000
 p2p-seed-node = seed1.blurt.world:2001              #  @blurt       (DE)                 (ASN: Hetzner Online GmbH)
 p2p-seed-node = seed2.blurt.world:2001              #  @blurt       (DE)                 (ASN: Hetzner Online GmbH)
 p2p-seed-node = blurtseed-se.privex.io:2015         #  @privex      (SE)                 (ASN: Privex Inc.)
+p2p-seed-node = blurtseed-ca.privex.io:2015         #  @privex      (CA)                 (ASN: Privex Inc.)
+p2p-seed-node = sgbox.someguy123.net:2015           #  @someguy123  (SE)                 (ASN: Privex Inc.)
 
 # Pairs of [BLOCK_NUM,BLOCK_ID] that should be enforced as checkpoints.
 # checkpoint =
