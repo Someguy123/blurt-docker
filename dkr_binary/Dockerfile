@@ -1,4 +1,8 @@
-FROM debian:10
+#FROM debian:10
+FROM ubuntu:20.10
+
+ENV DEBIAN_FRONTEND noninteractive
+
 
 RUN apt-get update && \
     apt-get install -y unzip curl wget jq net-tools dnsutils python3 python3-pip python3-dev python3-venv && \
