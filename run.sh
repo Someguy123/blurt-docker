@@ -173,6 +173,18 @@ fi
 : ${CONFIG_FILE="${DATADIR}/witness_node_data_dir/config.ini"}
 : ${NETWORK="blurt"}
 
+########
+# To simplify changing between file server domains / IP addresses for all forms
+# of downloadable blockchain files / chain state - including via both RSYNC and HTTP(S),
+# the 'DL_SERVER' variable allows users to override the download source for every download
+# source variable at once, including BC_HTTP, BC_HTTP_RAW, RSYNC_BASE and others :)
+########
+: ${DL_SERVER="files.privex.io"}
+# By default, DL_SERVER_RSYNC simply matches whatever DL_SERVER is set to.
+# The DL_SERVER_RSYNC variable can be set separately to DL_SERVER if for some reason
+# the Rsync download source(s) are on a different domain than the HTTP sources.
+: ${DL_SERVER_RSYNC="$DL_SERVER"}
+
 
 if [[ "$NETWORK" == "hive" ]]; then
     : ${DOCKER_IMAGE="hive"}
@@ -181,15 +193,18 @@ if [[ "$NETWORK" == "hive" ]]; then
     : ${NETWORK_NAME="Hive"}
     : ${SELF_NAME="Hive-in-a-box"}
     
-    : ${BC_HTTP="http://files.privex.io/hive/block_log.lz4"}        # HTTP or HTTPS url to grab the blockchain from. Set compression in BC_HTTP_CMP
-    : ${BC_HTTP_RAW="http://files.privex.io/hive/block_log"}        # Uncompressed block_log over HTTP
+    : ${BC_HTTP="http://${DL_SERVER}/hive/block_log.lz4"}        # HTTP or HTTPS url to grab the blockchain from. Set compression in BC_HTTP_CMP
+    : ${BC_HTTP_RAW="http://${DL_SERVER}/hive/block_log"}        # Uncompressed block_log over HTTP
     : ${BC_HTTP_CMP="lz4"}                                          # Compression type, can be "xz", "lz4", or "no" (for no compression)
 
-    : ${RSYNC_BASE="rsync://files.privex.io/hive"}
+    # HTTP or HTTPS url to grab shared_memory.bin from. Set compression in BC_HTTP_CMP
+    : ${SHM_HTTP="http://${DL_SERVER}/hive/shared_memory.bin.lz4"}
+
+    : ${RSYNC_BASE="rsync://${DL_SERVER_RSYNC}/hive"}
     : ${BC_RSYNC="${RSYNC_BASE}/block_log"}                         # Anonymous rsync daemon URL to the raw block_log
     
-    : ${ROCKSDB_RSYNC="${RSYNC_BASE}/rocksdb/"}                     # Rsync URL for MIRA RocksDB files
-    : ${SNAPSHOT_RSYNC="${RSYNC_BASE}/privexsnap/"}                 # Rsync URL for Eclipse Snapshot
+    #: ${ROCKSDB_RSYNC="${RSYNC_BASE}/rocksdb/"}                     # Rsync URL for MIRA RocksDB files
+    #: ${SNAPSHOT_RSYNC="${RSYNC_BASE}/privexsnap/"}                 # Rsync URL for Eclipse Snapshot
 
     : ${DK_TAG_BASE="someguy123/hive"}
 
@@ -201,7 +216,7 @@ if [[ "$NETWORK" == "hive" ]]; then
 
     : ${DKR_DATA_MOUNT="/steem"}    # Mount $DATADIR onto this folder within the container
     : ${DKR_SHM_MOUNT="/shm"}       # Mount $SHM_DIR onto this folder within the container
-    : ${DKR_RUN_BIN="steemd"}       # Run this executable within the container
+    : ${DKR_RUN_BIN="hived"}        # Run this executable within the container
 elif [[ "$NETWORK" == "blurt" ]]; then
     : ${DOCKER_IMAGE="blurt"}
     : ${STEEM_SOURCE="https://gitlab.com/blurt/blurt.git"}
@@ -209,14 +224,14 @@ elif [[ "$NETWORK" == "blurt" ]]; then
     : ${NETWORK_NAME="blurt"}
     : ${SELF_NAME="Blurt-in-a-box"}
     
-    : ${BC_HTTP="http://files.privex.io/blurt/block_log.lz4"}        # HTTP or HTTPS url to grab the blockchain from. Set compression in BC_HTTP_CMP
-    : ${BC_HTTP_RAW="http://files.privex.io/blurt/block_log"}        # Uncompressed block_log over HTTP
+    : ${BC_HTTP="http://${DL_SERVER}/blurt/block_log.lz4"}        # HTTP or HTTPS url to grab the blockchain from. Set compression in BC_HTTP_CMP
+    : ${BC_HTTP_RAW="http://${DL_SERVER}/blurt/block_log"}        # Uncompressed block_log over HTTP
     : ${BC_HTTP_CMP="lz4"}                                           # Compression type, can be "xz", "lz4", or "no" (for no compression)
-    : ${RSYNC_BASE="rsync://files.privex.io/blurt"}
+    : ${RSYNC_BASE="rsync://${DL_SERVER_RSYNC}/blurt"}
     : ${BC_RSYNC="${RSYNC_BASE}/block_log"}                         # Anonymous rsync daemon URL to the raw block_log
     
-    : ${ROCKSDB_RSYNC="${RSYNC_BASE}/rocksdb/"}                     # Rsync URL for MIRA RocksDB files
-    : ${SNAPSHOT_RSYNC="${RSYNC_BASE}/privexsnap/"}                 # Rsync URL for Eclipse Snapshot
+    #: ${ROCKSDB_RSYNC="${RSYNC_BASE}/rocksdb/"}                     # Rsync URL for MIRA RocksDB files
+    #: ${SNAPSHOT_RSYNC="${RSYNC_BASE}/privexsnap/"}                 # Rsync URL for Eclipse Snapshot
 
     : ${DK_TAG_BASE="someguy123/blurt"}
 
@@ -251,24 +266,31 @@ fi
 : ${SELF_NAME="Steem-in-a-box"}
 
 # HTTP or HTTPS url to grab the blockchain from. Set compression in BC_HTTP_CMP
-: ${BC_HTTP="http://files.privex.io/steem/block_log.lz4"}
+: ${BC_HTTP="http://${DL_SERVER}/steem/block_log.lz4"}
+
+# HTTP or HTTPS url to grab shared_memory.bin from. Set compression in BC_HTTP_CMP
+: ${SHM_HTTP="http://${DL_SERVER}/steem/shared_memory.bin.lz4"}
 
 # Uncompressed block_log over HTTP, used for getting size for truncation, and
 # potentially resuming downloads
-: ${BC_HTTP_RAW="http://files.privex.io/steem/block_log"}
+: ${BC_HTTP_RAW="http://${DL_SERVER}/steem/block_log"}
 
 # Compression type, can be "xz", "lz4", or "no" (for no compression)
 # Uses on-the-fly de-compression while downloading, to conserve disk space
 # and save time by not having to decompress after the download is finished
 : ${BC_HTTP_CMP="lz4"}
 
-: ${RSYNC_BASE="rsync://files.privex.io/steem"}
+: ${RSYNC_BASE="rsync://${DL_SERVER_RSYNC}/steem"}
 # Anonymous rsync daemon URL to the raw block_log, for repairing/resuming
 # a damaged/incomplete block_log. Set to "no" to disable rsync when resuming.
 : ${BC_RSYNC="${RSYNC_BASE}/block_log"}                         # Anonymous rsync daemon URL to the raw block_log
+: ${SHM_RSYNC="${RSYNC_BASE}/shared_memory.bin"}                # Anonymous rsync daemon URL to shared_memory.bin
 
 : ${ROCKSDB_RSYNC="${RSYNC_BASE}/rocksdb/"}                     # Rsync URL for MIRA RocksDB files
-: ${SNAPSHOT_RSYNC="${RSYNC_BASE}/privexsnap/"}                 # Rsync URL for Eclipse Snapshot
+
+: ${SNAPSHOT_NAME="privexsnap"}
+: ${SNAPSHOT_RSYNC="${RSYNC_BASE}/${SNAPSHOT_NAME}/"}           # Rsync URL for Eclipse Snapshot
+: ${SNAPSHOT_OUTDIR="${DATADIR}/witness_node_data_dir/snapshot/${SNAPSHOT_NAME}/"}
 
 : ${DK_TAG_BASE="someguy123/steem"}
 : ${DK_TAG="${DK_TAG_BASE}:latest"}
@@ -305,6 +327,7 @@ fi
 : ${AUTO_FIX_BLOCKINDEX=0}
 : ${AUTO_FIX_ROCKSDB=0}
 : ${AUTO_FIX_SNAPSHOT=0}
+: ${AUTO_FIX_SHM=0}
 
 # If AUTO_FIX_BLOCKLOG is set to 1, this controls whether we verify block_log via checksummed rsync, in the
 # event that the local block_log is the same size as the remote block_log
@@ -381,7 +404,8 @@ export RED GREEN YELLOW BLUE BOLD NORMAL RESET
 # load helpers
 # source "${SIAB_DIR}/scripts/010_helpers.sh"
 
-siab_load_lib helpers docker stateshot
+siab_load_lib helpers docker stateshot 
+siab_load_lib rpclib
 
 # if the config file doesn't exist, try copying the example config
 if [[ ! -f "$CONF_FILE" ]]; then
@@ -486,6 +510,7 @@ help() {
     remote_wallet   - open cli_wallet in the container connecting to a remote seed
 
     enter           - enter a bash session in the currently running container
+    health          - shows health of node for ensuring its running properly
     shell           - launch the ${NETWORK_NAME} container with appropriate mounts, then open bash for inspection
     "
     echo
@@ -932,6 +957,86 @@ fix-blocks-rocksdb() {
     fi
 }
 
+fix-blocks-shm() {
+    local shm_exists=0 shm_file="${SHM_DIR}/shared_memory.bin"
+    local snap_prompt=" ${MAGENTA}Do you want to synchronise your shared_memory.bin file with the server?${RESET}" 
+    if [[ -f "$shm_file" ]]; then
+        shm_exists=1 
+    fi
+
+    msg
+    msg bold green " ========================================================================"
+    msg bold green " =                                                                      ="
+    msg bold green " =               Download ${NETWORK_NAME} Shared Memory File                       ="
+    msg bold green " =                                                                      ="
+    msg bold green " =                  ( !!! NOT RECOMMENDED !!! )                         ="
+    msg bold green " =                                                                      ="
+    msg bold green " ========================================================================"
+    msg
+    if [[ ! -d "$(dirname "$shm_file")" ]]; then
+        msgerr yellow " [!!!] The folder which is supposed to contain your shared_memory.bin file DOES NOT EXIST."
+        msgerr yellow " [!!!] Auto-creating folder... Folder is: $(dirname "$shm_file")"
+        mkdir -vp "$(dirname "$shm_file")"
+    fi
+
+    msg nots yellow " >> If you have problems using the standard Hive State Snapshot system, for example, on systems with <=8GB RAM,"
+    msg nots yellow " >> then you MAY be able to use a published 'shared_memory.bin' file instead."
+    msg
+    msg nots red    " >> Please be warned! Unlike regular State Snapshots - using a shared_memory.bin file requires that **almost everything**" 
+    msg nots red    " >> in your Hive installation matches the system where the shared_memory.bin file was originally created on."
+    msg nots red    " >> With the official Privex 'shared_memory.bin' file, the key requirements to be able to use it are as follows:"
+    msg
+    msg nots bold cyan   "     * You must be running one of my (Someguy123) published low-memory (seed/witness) Docker images,"
+    msg nots bold cyan   "       and your version should ideally be exactly the same as what the creation server used."
+    msg
+    msg nots bold cyan   "       If you built your own image file using './run.sh build', then it's unlikely that the published"
+    msg nots bold cyan   "       shared_memory.bin file will work on your system."
+    msg
+    msg nots bold cyan   "       We publish information about the creation environment here: https://files.privex.io/hive/state-README.txt"
+    msg
+    msg
+    msg nots bold cyan   "     * Your 'block_log' AND 'block_log.index' must 100% match the block_log and index used by the creation server."
+    msg nots bold cyan   "       For the default 'files.privex.io' data source, we try to ensure that the block_log and index available for"
+    msg nots bold cyan   "       download match the block log + index of the server we created the shared_memory.bin file on. "
+    msg
+    msg
+    msg nots bold cyan   "     * You must be running the default witness/seed plugins that are enabled by default on a ${SELF_NAME} installation."
+    msg nots bold cyan   "       However, you should be able to also enable any plugins which **do not require a replay**, such as block_api."
+    msg
+    msg
+    msg nots bold cyan   "     * In some cases, the shared_memory.bin file may be incompatible with your ${SELF_NAME} setup for varying reasons,"
+    msg nots bold cyan   "       sometimes a shared_memoey.bin file can be rejected by the ${NETWORK_NAME} simply because your CPU is different..."
+    msg
+    msg
+    msg nots cyan   "    Local Shared Memory File:           ${BOLD}${SHM_DIR}/shared_memory.bin"
+    msg nots cyan   "    Remote Shared Memory source:        ${BOLD}$SHM_RSYNC"
+    msg
+
+
+    _fb_shm_inner() {
+        msg
+        msg nots green "\n [...] Updating shared_memory.bin files to match the remote server's copy ..."
+        rsync -avIh --progress --sparse "${SHM_RSYNC}" "$shm_file"
+        msg
+        msg green " [+++] Finished downloading/validating shared memory file into ${shm_file} \n"
+    }
+ 
+    if (( shm_exists )); then
+        msg nots cyan   "    Local shared_memory.bin file exists:    ${BOLD}${GREEN}YES"
+    else
+        msg nots cyan   "    Local shared_memory.bin file exists:    ${BOLD}${RED}NO"
+    fi
+    msg
+    
+    if (( shm_exists == 0 )) && _fixbl_prompt "$AUTO_FIX_SHM" "$snap_prompt (Y/n) > " defyes; then
+        _fb_shm_inner
+    elif (( shm_exists )) && _fixbl_prompt "$AUTO_FIX_SHM" "$snap_prompt (y/N) > " defno; then
+        _fb_shm_inner
+    else
+        msg nots red "\n [!!!] Not synchronising shared memory file with remote server \n"
+    fi
+}
+
 fix-blocks-snapshot() {
     msg
     msg bold green " ========================================================================"
@@ -944,16 +1049,40 @@ fix-blocks-snapshot() {
     msg nots yellow " >> For Hive 1.24.0 and newer, a special snapshot format is now available, and snapshots are published" 
     msg nots yellow " >> by Privex regularly. These snapshots work with non-MIRA, and possibly MIRA installations too."
     msg
-    msg nots cyan   "    Local Snapshot folder:           ${BOLD}${DATADIR}/witness_node_data_dir/snapshot/privexsnap/"
+    msg nots cyan   "    Local Snapshot folder:           ${BOLD}$SNAPSHOT_OUTDIR"
     msg nots cyan   "    Remote Snapshot source:          ${BOLD}$SNAPSHOT_RSYNC"
     msg
-    msg
-    if _fixbl_prompt "$AUTO_FIX_SNAPSHOT" " ${MAGENTA}Do you want to synchronise your snapshot files with the server?${RESET} (y/N) > " defno; then
+
+    local snap_exists=0 snap_filecount=0 snap_filelist
+    local snap_prompt=" ${MAGENTA}Do you want to synchronise your snapshot files with the server?${RESET}" 
+    snap_filelist=()
+    if [[ -d "$SNAPSHOT_OUTDIR" ]]; then
+        snap_exists=1 
+        #snap_filecount=${#snap_filelist[@]}
+        snap_filecount=$(ls "$SNAPSHOT_OUTDIR" | wc -l)
+        snap_filecount=$(( snap_filecount - 1 ))
+    fi
+
+    _fb_snap_inner() {
         msg
         msg nots green "\n [...] Updating Snapshot files to match the remote server's copy ..."
         _SILENCE_RDB_INTRO=1 _dlsnapshot
         msg
         msg green " [+++] Finished downloading/validating Snapshot files into ${DATADIR}/witness_node_data_dir/snapshot/privexsnap/ \n"
+    }
+ 
+    if (( snap_exists )); then
+        msg nots cyan   "    Local snapshot folder exists:    ${BOLD}${GREEN}YES"
+        msg nots cyan   "    Local snapshot subfolder count:  ${BOLD}${snap_filecount}${RESET} (state snapshots normally contain 20+ sub-folders)"
+    else
+        msg nots cyan   "    Local snapshot folder exists:    ${BOLD}${RED}NO"
+    fi
+    msg
+    
+    if (( snap_filecount <= 2 )) && _fixbl_prompt "$AUTO_FIX_SNAPSHOT" "$snap_prompt (Y/n) > " defyes; then
+        _fb_snap_inner
+    elif (( snap_filecount > 2 )) && _fixbl_prompt "$AUTO_FIX_SNAPSHOT" "$snap_prompt (y/N) > " defno; then
+        _fb_snap_inner
     else
         msg nots red "\n [!!!] Not synchronising snapshot files with remote server \n"
     fi
@@ -963,7 +1092,7 @@ _fix_blocks_help() {
     MSG_TS_DEFAULT=0
     msg
     msg green "Usage:"
-    msg green "    $0 fix-blocks (blocklog|index|rocksdb|all) (auto)"
+    msg green "    $0 fix-blocks (blocklog|index|snapshot|shm|rocksdb|all) (auto)"
     msg
     msg yellow "Examples:"
     msg bold   "\t # Download/replace/repair the block_log, block_log.index, and rocksdb files - prompting user before starting each action"
@@ -1019,6 +1148,10 @@ _fix_blocks_help() {
     msg
     msg green " index / blockindex / block_index   - Download / replace / repair local block_log.index from remote blockchain mirror, using rsync with checksumming. "
     msg
+    msg green " snap / snapshot                    - Download / update / repair local 'privexsnap' Hive state snapshot from remote mirror, using rsync"
+    msg
+    msg green " shm / shared / mem / memory        - Download / update / repair local 'shared_memory.bin' state file from remote mirror, using rsync"
+    msg
     msg green " rocksdb / rocks / mira             - Download / replace / repair local RocksDB files (for MIRA images) from remote blockchain mirror, "
     msg green "                                      using rsync with checksumming, and partial-dir allowing for resuming of download if it fails. "
     msg
@@ -1050,6 +1183,9 @@ fix-blocks() {
             snap*)
                 fix-blocks-snapshot
                 return $?;;
+            shm*|shared*|mem*|SHM*|SHARED*|MEM*)
+                fix-blocks-shm
+                return $?;;
             all)
                 echo
                 ;;
@@ -1071,8 +1207,10 @@ fix-blocks() {
     msg "\n"
     fix-blocks-snapshot
     msg "\n"
-    fix-blocks-rocksdb
+    fix-blocks-shm
     msg "\n"
+    #fix-blocks-rocksdb
+    #msg "\n"
     return 0
 }
 
@@ -1744,7 +1882,7 @@ _docker_run_base() {
 # and the docker args '--rm' and '-i' are appended to DKR_RUN_ARGS
 _docker_int_autorm() {
     : "${DKR_MOUNT_VOLS=1}"
-    DKR_RUN_ARGS=("--rm" "-i")
+    DKR_RUN_ARGS+=("--rm" "-i")
     _docker_run_base "$@"
 }
 
@@ -2021,6 +2159,67 @@ clean-logs() {
         sed -e "s/\r\x1B\[0m//g"
 }
 
+
+# usage: log_path="$(_dkr-get-logfile)"
+# outputs the path to the docker log file for the container DOCKER_NAME
+_dkr-get-logfile() {
+    if ! command -v jq &>/dev/null; then
+        >&2 msg red "jq not found. Attempting to install..."
+        sleep 3
+        >&2 sudo apt update
+        >&2 sudo apt install -y jq
+    fi
+    docker inspect "$DOCKER_NAME" | jq -r '.[0].LogPath'
+}
+
+# usage:
+#     _clean-json-logline '{"log": "123456ms example.cpp:123      lorem_ipsum  ] some log message\r\n", "stream": "stdout", "time": "2020-10-15T01:54:23.136155899Z"}'
+#     cat <<< '{"log": "123456ms example.cpp:123      lorem_ipsum  ] some log message\r\n", "stream": "stdout", "time": "2020-10-15T01:54:23.136155899Z"}' | _clean-json-logline
+#
+# Parses a Docker JSON log entry line using jq and sed, and outputs a much cleaner, easier to read, and timestamped log line, with
+# properly working colours.
+# A log line can be fed in either as the first parameter, or via STDIN.
+#
+# For parsing multiple lines (whether via stdin or parameters), see the multi-line function: _clean-json-logline
+#
+_clean-json-logline() {
+    local line L
+    (( $# > 0 )) && line="$1" || read -r line
+    # first, parse the line and print the time + log
+    L=$(jq -r ".time +\" \" + .log" <<<"$line")
+    # then, remove excessive \r's causing multiple line breaks
+    L=$(sed -e "s/\r//" <<< "$L")
+    # now remove the decimal time to make the logs cleaner
+    L=$(sed -e 's/\..*Z//' <<< "$L")
+    # remove the steem ms time because most people don't care
+    L=$(sed -e 's/[0-9]\+ms //' <<< "$L")
+    # and finally, strip off any duplicate new line characters
+    L=$(tr -s "\n" <<< "$L")
+    printf '%s\r\n' "$L"
+}
+
+: ${CLEAN_JSON_LOOP_TIMEOUT=20}
+: ${CLEAN_JSON_INIT_TIMEOUT=3}
+
+_clean-json-loglines() {
+    local line
+    if (( $# > 0 )); then
+        for line in "$@"; do
+            _clean-json-logline <<< "$line"
+        done
+        return $?
+    fi
+
+    if read -t $CLEAN_JSON_INIT_TIMEOUT -r line; then
+        _clean-json-logline <<< "$line"
+        while read -t $CLEAN_JSON_LOOP_TIMEOUT -r line; do
+            _clean-json-logline <<< "$line"
+        done
+        return $?
+    fi
+    return 1
+}
+
 # Usage: ./run.sh tslogs
 # (warning: may require root to work properly in some cases)
 # Shows the Steem logs, but with UTC timestamps extracted from the docker logs.
@@ -2031,38 +2230,8 @@ clean-logs() {
 #                   on block 28398481 by someguy123 -- Block Time Offset: -345 ms
 #
 tslogs() {
-    if [[ ! $(command -v jq) ]]; then
-        msg red "jq not found. Attempting to install..."
-        sleep 3
-        sudo apt update
-        sudo apt install -y jq
-    fi
-    local LOG_PATH=$(docker inspect "$DOCKER_NAME" | jq -r .[0].LogPath)
-    local pipe="$(mktemp).fifo"
-    trap "rm -f '$pipe'" EXIT
-    if [[ ! -p "$pipe" ]]; then
-        mkfifo "$pipe"
-    fi
-    # the sleep is a dirty hack to keep the pipe open
-
-    sleep 10000 < "$pipe" &
-    tail -n 100 -f "$LOG_PATH" &> "$pipe" &
-    while true
-    do
-        if read -r line <"$pipe"; then
-            # first, parse the line and print the time + log
-            L=$(jq -r ".time +\" \" + .log" <<<"$line")
-            # then, remove excessive \r's causing multiple line breaks
-            L=$(sed -e "s/\r//" <<< "$L")
-            # now remove the decimal time to make the logs cleaner
-            L=$(sed -e 's/\..*Z//' <<< "$L")
-            # remove the steem ms time because most people don't care
-            L=$(sed -e 's/[0-9]\+ms //' <<< "$L")
-            # and finally, strip off any duplicate new line characters
-            L=$(tr -s "\n" <<< "$L")
-            printf '%s\r\n' "$L"
-        fi
-    done
+    local LOG_PATH="$(_dkr-get-logfile)"
+    tail -n 100 -f "$LOG_FILE" | _clean-json-loglines
 }
 
 # Internal use only
@@ -2088,6 +2257,64 @@ simplecommitlog() {
     git --no-pager log --pretty=format:"$commit_format" $args
 }
 
+_flatcommitlog() {
+    local commit_format="format:%C(yellow)%h  ||%Cred%an  ||%Cblue%cd||%Cgreen%s%n"
+    git --no-pager log --color=always --date=relative --pretty="${commit_format}" "$@"
+}
+flatcommitlog() {
+    local gargs
+    
+    gargs=()
+
+    if (( $# >= 2 )); then
+        gargs+=("-n" "$2" "$1")
+    elif (( $# > 0 )); then
+        gargs+=("$1")
+    fi
+    _flatcommitlog "${gargs[@]}" | column -t -s '||' 2>/dev/null
+}
+
+is-git-uptodate() {
+    git remote update >/dev/null
+    git_update=$(git status -uno)
+    grep -Eiq "up.to.date" <<< "$git_update"
+}
+
+# show-git-updates [format=flat] [remote_ref=origin/master] [count=infinite]
+show-git-updates() {
+    local log_fmt="flat" remote_ref="origin/master" count=0
+    local fullref xgargs
+    current_branch=$(git branch | grep '\*' | cut -d ' ' -f2)
+    xgargs=()
+    (( $# > 0 )) && log_fmt="$1"
+    (( $# > 1 )) && remote_ref="$2"
+    (( $# > 2 )) && count="$3"
+    
+    if is-git-uptodate; then
+        >&2 msg nots bold yellow " [+++] Your current branch '${current_branch} is already synced up to it's upstream ( ${remote_ref} )\n"
+        return
+    fi
+
+    fullref="HEAD..${remote_ref}"
+    
+    xgargs+=("$fullref")
+    if (( count > 0 )); then xgargs+=("$count"); fi
+    
+    if [[ "$remote_ref" == "origin/${current_branch}" ]]; then
+
+        >&2 msg nots bold cyan " >>> New updates are available via Git from the upstream/origin Git branch: '${remote_ref}'"
+        >&2 msg nots bold cyan " >>> You should run 'git pull' if you want to download these new updates :)\n"
+    else
+        >&2 msg nots bold cyan " >>> New updates are available if you upgrade to / pull the remote branch '${remote_ref}'"
+        >&2 msg nots bold cyan " >>> Warning: Cannot confirm whether or not '${remote_ref}' is the upstream branch for your current active branch: ${current_branch}\n"
+    fi
+    >&2 msg nots bold green " --- New commits between Git refs '${fullref}' ---"
+    if [[ "$log_fmt" == "simple" ]]; then
+        simplecommitlog "${xgargs[@]}"
+    else
+        flatcommitlog "${xgargs[@]}"
+    fi
+}
 
 # Usage: ./run.sh ver
 # Displays information about your Steem-in-a-box version, including the docker container
@@ -2532,6 +2759,34 @@ publish_binary() {
     [[ "$SECTAG" != "n/a" ]] && msg bold green "\n [...] Pushing second tag $SECOND_TAG\n" && docker push "$SECOND_TAG"
     msg bold green "\n +++ Finished +++ \n"
 }
+health() {
+
+    MSG_TS_DEFAULT=0
+    set +euE
+    set +o pipefail
+    local dk_ver="$(_docker_int_autorm cat /steem_build.txt | sed -rn 's#Git version/commit\:[ \t]+([a-zA-Z0-9._-]+)#\1#p')"
+    local dk_logpath="$(_dkr-get-logfile)"
+    local dk_lastline dk_runver
+    dk_lastline=$(tail -n 100 "$dk_logpath" | _clean-json-loglines | grep -E 'Got [0-9]+ transactions on' | tail -n 1)
+    dk_runver=$(grep 'blockchain version' "$dk_logpath" | _clean-json-loglines | sed -rn 's#.*blockchain version:[ \t]+([a-zA-Z0-9._-]+)#\1#p')
+    sb_privkey="$(grep --context=2 -E '^private-key[ \t]+=' "$CONFIG_FILE" | sed -rn 's/.*private-key[\t ]+?=[\t ]+?(5[a-zA-Z0-9]+)$/\1/p')"
+    sb_pubkey="$(grep --context=2 -E '^private-key[ \t]+=' "$CONFIG_FILE" | sed -rn 's/.*(STM[a-zA-Z0-9]+).*/\1/p')"
+
+    {
+        msg nots bold cyan "Hostname:\t${GREEN}${HOSTNAME}"
+        CURL_BIN="docker exec $DOCKER_NAME curl"
+        export CURL_BIN
+        rpc-health "http://127.0.0.1:8091" | grep -Ev '^Host'
+        #msg nots bold cyan "Currently Running Version:              ${GREEN}${dk_runver}"
+        msg nots bold cyan "Installed Image Version:\t${GREEN}${dk_ver}"
+        msg nots bold cyan "Signing Private Key:\t${GREEN}${sb_privkey}"
+        msg nots bold cyan "Signing Public Key:\t${GREEN}${sb_pubkey}"
+    } | sed -r 's/: [ ]+/\t/' | column -t -s $'\t' 
+
+    msg nots bold cyan "Latest block received (from logs): \n"
+    msg nots green     "    $dk_lastline\n"
+
+}
 
 
 if [ "$#" -lt 1 ]; then
@@ -2552,6 +2807,9 @@ case $1 in
         ;;
     binar*_build|binar*-build|build_binar*|build-binar*)
         build_binary "${@:2}"
+        ;;
+    health)
+        health "${@:2}"
         ;;
     install_docker)
         install_docker
