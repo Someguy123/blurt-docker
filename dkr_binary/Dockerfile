@@ -1,10 +1,13 @@
 FROM debian:10
 
 RUN apt-get update && \
-    apt-get install -y unzip wget libbz2-dev libsnappy-dev libncurses5 libncurses5-dev libreadline-dev && \
+    apt-get install -y unzip curl wget jq net-tools dnsutils python3 python3-pip python3-dev python3-venv && \
+    apt-get install -y liblz4-tool libbz2-dev libsnappy-dev libncurses5 libncurses5-dev libreadline-dev && \
     apt-get clean -qy
 
-ARG BLURT_JOB="676941016"
+# BLURT_JOB references a gitlab job number to download binary artifacts from: https://gitlab.com/blurt/blurt/-/jobs
+# full node job: 948413415
+ARG BLURT_JOB="948413416"
 ENV BLURT_JOB ${BLURT_JOB}
 
 ARG BLURT_BINARY_URL="https://gitlab.com/blurt/blurt/-/jobs/${BLURT_JOB}/artifacts/download?file_type=archive"
